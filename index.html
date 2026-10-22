@@ -98,13 +98,23 @@ textarea{min-height:220px;font-size:13px;line-height:1.45;white-space:pre;overfl
 .seg{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
 .seg button{flex:1;min-width:48px;font-size:14px;background:transparent;border:1px solid var(--line);color:var(--ink);padding:8px 6px}
 .seg button[aria-pressed="true"]{background:var(--gold-solid);border-color:var(--gold-solid);color:var(--on-gold);font-weight:700}
-.pay{margin-top:6px}
-.prow{display:grid;grid-template-columns:1fr 96px 44px;grid-template-areas:"chi chi chi" "met imp x";gap:6px;align-items:end;margin:8px 0;padding-top:8px}
-.prow+.prow{border-top:1px dashed var(--line)}
-.c-chi{grid-area:chi}.c-met{grid-area:met}.c-imp{grid-area:imp}.c-x{grid-area:x}
-.prow .auto{min-height:44px;display:flex;align-items:center;justify-content:flex-end;padding:0 8px;border:1px dashed var(--line);font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
-.prow input{text-align:right}
-.prow .sp{width:44px}
+.pay{margin-top:10px;background:var(--bg);border:1px solid var(--line);padding:12px 14px 14px}
+.pay-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-variant-numeric:tabular-nums}
+.pay-head span{color:var(--muted);font-size:13px}
+.pay-head strong{font-family:Orbitron,"Arial Black",sans-serif;font-size:22px;color:var(--gold)}
+.pay .q{font-size:13px;color:var(--muted);margin:14px 0 2px}
+.pay .seg button{min-height:52px;min-width:0;font-family:Roboto,"Helvetica Neue",Arial,sans-serif;text-transform:none;letter-spacing:0;font-size:15px;font-weight:500;line-height:1.2}
+.pay .seg button[aria-pressed="true"]{font-weight:700}
+.pay .seg button:disabled{opacity:.4;cursor:not-allowed}
+.pay select{margin-top:8px}
+.pay .split{margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+.pay .split .auto{min-height:44px;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;border:1px dashed var(--line);font-variant-numeric:tabular-nums}
+.pay .hint{font-size:13px;color:var(--muted);margin:8px 0 0}
+.pay .recap{font-size:14px;margin:12px 0 0;padding-top:10px;border-top:1px dashed var(--line);font-variant-numeric:tabular-nums}
+.pay .nopay{margin:10px 0 0;font-weight:500}
+.istr-new{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:8px}
+.link{background:none;border:0;color:var(--gold);text-decoration:underline;padding:6px 0;min-height:0;font-size:13px}
+@media (max-width:420px){.istr-new{grid-template-columns:1fr 1fr}.istr-new input{grid-column:1/-1}}
 .sublabel{font-size:12px;color:var(--muted);margin:10px 0 0}
 .det{font-size:13px;margin:4px 0 0}
 .det div{display:flex;justify-content:space-between;padding:3px 0;font-variant-numeric:tabular-nums}
@@ -164,8 +174,13 @@ summary{font-size:14px}
     </div>
     <div id="altro-box" class="hidden"><label for="d-ingresso">Ingresso al campo (€)</label><input type="number" id="d-ingresso" min="0" step="1" inputmode="decimal"></div>
     <label for="d-istr">Istruttore</label>
-    <input id="d-istr" list="istruttori" autocomplete="off" placeholder="Nome e cognome">
-    <datalist id="istruttori"></datalist>
+    <select id="d-istr"></select>
+    <div class="istr-new hidden" id="istr-new">
+      <input id="istr-nome" autocomplete="off" placeholder="Nome e cognome del nuovo istruttore" aria-label="Nome e cognome del nuovo istruttore">
+      <button class="btn" id="istr-add" type="button">Aggiungi</button>
+      <button class="btn-ghost" id="istr-cancel" type="button">Annulla</button>
+    </div>
+    <button class="link hidden" id="istr-del" type="button">Rimuovi questo istruttore dall’elenco</button>
     <p class="note" id="campo-note"></p>
   </section>
 
@@ -210,17 +225,34 @@ summary{font-size:14px}
 <script src="listino.js"></script>
 <script>
 /* ===== STATO ===== */
-const KEY='tda-calcolatore-v2';
+const KEY='tda-calcolatore-v3', KEY_OLD='tda-calcolatore-v2', KEY_ISTR='tda-istruttori-v1';
 let S;
+let ISTR_EXTRA=[]; // istruttori aggiunti a mano su questo dispositivo
 const uid=()=>Math.random().toString(36).slice(2,9);
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+/* pagamento: chi = 'self' o id di un altro partecipante; metodo = Contanti | Bonifico | Misto; cash = contanti se Misto */
 function nuovo(){return {id:uid(),nome:'',pac:'',ore:1,tariffa:LISTINO.pacchetti.find(x=>x.orario).prezzo,extra:{},tess:false,
-  vou:false,vcod:'',vente:'TDA',vval:'',sc:'',scEur:'',motivo:'',pag:[{chi:'self',metodo:'Contanti'}]}}
+  vou:false,vcod:'',vente:'TDA',vval:'',sc:'',scEur:'',motivo:'',chi:'self',metodo:'Contanti',cash:''}}
+function migra(old){
+  // giornata salvata con la vecchia sezione pagamenti: si tiene il primo pagamento
+  (old.p||[]).forEach(p=>{
+    if(p.pag){const r=p.pag[0]||{};p.chi=r.chi||'self';p.metodo=r.metodo==='Bonifico'?'Bonifico':'Contanti';p.cash='';delete p.pag}
+  });
+  return old;
+}
 function load(){
   try{const r=localStorage.getItem(KEY);if(r){S=JSON.parse(r);return}}catch(e){}
+  try{const r=localStorage.getItem(KEY_OLD);if(r){S=migra(JSON.parse(r));return}}catch(e){}
   S={data:today(),campo:'orroli',ingresso:'',istr:'',p:[nuovo()]};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function loadIstr(){try{const a=JSON.parse(localStorage.getItem(KEY_ISTR)||'[]');ISTR_EXTRA=Array.isArray(a)?a.filter(x=>typeof x==='string'):[]}catch(e){ISTR_EXTRA=[]}}
+function saveIstr(){try{localStorage.setItem(KEY_ISTR,JSON.stringify(ISTR_EXTRA))}catch(e){}}
+function elencoIstr(){
+  const set=new Map();
+  LISTINO.istruttori.concat(ISTR_EXTRA).forEach(n=>{if(n&&!set.has(n.toLowerCase()))set.set(n.toLowerCase(),n)});
+  return [...set.values()].sort((a,b)=>a.localeCompare(b,'it'));
+}
 
 /* ===== CALCOLI ===== */
 const r2=n=>Math.round(n*100)/100;
@@ -253,12 +285,18 @@ function calc(p){
   const vval=p.vou?Math.max(0,num(p.vval)):0;
   const buono=r2(Math.min(vval,netto)), residuo=r2(vval-buono);
   const dovuto=r2(netto-buono);
-  // pagamenti: riga 0 = resto automatico
-  let esplicito=0;p.pag.slice(1).forEach(r=>esplicito+=Math.max(0,num(r.imp)));
-  esplicito=r2(esplicito);
-  const resto=r2(dovuto-esplicito);
-  const righe=p.pag.map((r,i)=>({chi:r.chi==='self'?p.id:r.chi,metodo:r.metodo,imp:i===0?Math.max(0,resto):Math.max(0,num(r.imp))}));
-  return {pk,pkg,righeCal,extra,base,ing,tes,listino,sconto,scLab,netto,vval,buono,residuo,dovuto,resto,righe};
+  // pagamento: un solo pagatore; con "Misto" i contanti sono indicati e il resto va a bonifico
+  const chi=(p.chi&&p.chi!=='self')?p.chi:p.id;
+  let contanti=0,bonifico=0;
+  if(dovuto>0){
+    if(p.metodo==='Misto'){contanti=r2(Math.min(dovuto,Math.max(0,num(p.cash))));bonifico=r2(dovuto-contanti)}
+    else if(p.metodo==='Bonifico')bonifico=dovuto;
+    else contanti=dovuto;
+  }
+  const righe=[];
+  if(contanti)righe.push({chi,metodo:'Contanti',imp:contanti});
+  if(bonifico)righe.push({chi,metodo:'Bonifico',imp:bonifico});
+  return {pk,pkg,righeCal,extra,base,ing,tes,listino,sconto,scLab,netto,vval,buono,residuo,dovuto,contanti,bonifico,righe};
 }
 function sigla(p,c){
   const parts=[];
@@ -285,14 +323,31 @@ function calRows(p){
     </div>
     <div class="tiers">${Object.entries(c.tagli).map(([q,v])=>q+' colpi '+eur(v)).join(', ')}; poi ${eur(c.colpo)} a colpo</div>`).join('');
 }
-function payRows(p){
-  return p.pag.map((r,i)=>`
-    <div class="prow" data-row="${i}">
-      <div class="c-chi">${i===0?'<label>Chi paga</label>':''}<select data-pf="chi" data-row="${i}" aria-label="Chi paga"></select></div>
-      <div class="c-met">${i===0?'<label>Metodo</label>':''}<select data-pf="metodo" data-row="${i}" aria-label="Metodo">${LISTINO.metodi.map(m=>opt(m,m,r.metodo)).join('')}</select></div>
-      <div class="c-imp">${i===0?'<label>Importo</label><div class="auto" data-out="resto"></div>':`<input type="number" min="0" step="0.5" inputmode="decimal" data-pf="imp" data-row="${i}" value="${esc(r.imp)}" placeholder="€" aria-label="Importo">`}</div>
-      <div class="c-x">${i===0?'':`<button class="x" data-act="delrow" data-row="${i}" aria-label="Rimuovi pagamento">×</button>`}</div>
-    </div>`).join('');
+const METODI_UI=[['Contanti','Contanti'],['Bonifico','Bonifico'],['Misto','Contanti + bonifico']];
+function payBox(p){
+  return `
+    <div class="pay-head"><span>Da pagare</span><strong data-out="dov2"></strong></div>
+    <p class="nopay hidden" data-box="nopay">Niente da pagare: tutto coperto da sconto o buono.</p>
+    <div data-box="payform">
+      <p class="q">1. Chi paga?</p>
+      <div class="seg" role="group" aria-label="Chi paga">
+        <button type="button" data-act="chi" data-v="self" data-out="selfname"></button>
+        <button type="button" data-act="chi" data-v="other">Un altro partecipante</button>
+      </div>
+      <div class="hidden" data-box="other">
+        <select data-f="chi" aria-label="Quale partecipante paga"></select>
+      </div>
+      <p class="hint hidden" data-box="noother">Per far pagare un altro, aggiungi prima l’altro partecipante.</p>
+      <p class="q">2. Come paga?</p>
+      <div class="seg" role="group" aria-label="Come paga">
+        ${METODI_UI.map(([v,l])=>`<button type="button" data-act="met" data-v="${v}" aria-pressed="${p.metodo===v}">${l}</button>`).join('')}
+      </div>
+      <div class="split hidden" data-box="mixed">
+        <div><label>Quanti contanti? (€)</label><input type="number" min="0" step="1" inputmode="decimal" data-f="cash" value="${esc(p.cash)}" placeholder="€"></div>
+        <div><label>Il resto, in bonifico</label><div class="auto" data-out="bank"></div></div>
+      </div>
+    </div>
+    <p class="recap" data-out="recap"></p>`;
 }
 function card(p,i){
   const lez=LISTINO.pacchetti.find(x=>x.id===p.pac)?.orario;
@@ -328,30 +383,46 @@ function card(p,i){
     </div>
 
     <p class="sublabel">Pagamento</p>
-    <div class="pay">${payRows(p)}</div>
-    <button class="btn-ghost full" data-act="addrow">Dividi il pagamento</button>
+    <div class="pay">${payBox(p)}</div>
 
     <div class="msg-err" data-out="err"></div>
     <details><summary>Dettaglio del calcolo</summary><div class="det" data-out="det"></div></details>
     <div class="calc">
       <div><span>Listino</span><strong data-out="prev"></strong></div>
-      <div><span>Da pagare</span><strong data-out="dov"></strong></div>
-      <div class="due"><span>Pagato</span><strong data-out="paid"></strong></div>
+      <div class="due"><span>Da pagare</span><strong data-out="dov"></strong></div>
     </div>
   </div>`;
+}
+function renderIstr(){
+  const nomi=elencoIstr();
+  if(S.istr&&!nomi.some(n=>n.toLowerCase()===S.istr.toLowerCase()))nomi.push(S.istr);
+  $('#d-istr').innerHTML=`<option value="">Scegli l’istruttore…</option>`+nomi.map(n=>opt(n,n,S.istr)).join('')+`<option value="__new">＋ Aggiungi un nuovo istruttore…</option>`;
+  $('#d-istr').value=S.istr;
+  $('#istr-del').classList.toggle('hidden',!ISTR_EXTRA.some(n=>n===S.istr));
+}
+function apriNuovoIstr(){
+  $('#istr-new').classList.remove('hidden');$('#istr-nome').value='';$('#istr-nome').focus();
+}
+function chiudiNuovoIstr(){$('#istr-new').classList.add('hidden');$('#d-istr').value=S.istr}
+function aggiungiIstr(){
+  const nome=$('#istr-nome').value.trim().split(/\s+/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');
+  if(!nome){$('#istr-nome').focus();return}
+  const gia=elencoIstr().find(n=>n.toLowerCase()===nome.toLowerCase());
+  if(!gia){ISTR_EXTRA.push(nome);saveIstr()}
+  S.istr=gia||nome;
+  $('#istr-new').classList.add('hidden');renderIstr();update();
 }
 function render(){
   $('#d-data').value=S.data;
   $('#d-campo').innerHTML=LISTINO.campi.map(c=>opt(c.id,c.nome,S.campo)).join('');
   $('#d-ingresso').value=S.ingresso??'';
-  $('#d-istr').value=S.istr;
-  $('#istruttori').innerHTML=LISTINO.istruttori.map(n=>`<option value="${esc(n)}">`).join('');
+  renderIstr();
   $('#plist').innerHTML=S.p.map(card).join('');
   update();
 }
 function update(){
   const ids=new Set(S.p.map(p=>p.id));
-  S.p.forEach(p=>p.pag.forEach(r=>{if(r.chi!=='self'&&!ids.has(r.chi))r.chi='self'}));
+  S.p.forEach(p=>{if(p.chi!=='self'&&!ids.has(p.chi))p.chi='self'});
   const C={};S.p.forEach(p=>C[p.id]=calc(p));
   // aggregati per pagatore
   const paid={},forOthers={},byOthers={};
@@ -359,8 +430,15 @@ function update(){
   S.p.forEach(p=>C[p.id].righe.forEach(r=>{
     if(!r.imp)return;
     paid[r.chi][r.metodo]=(paid[r.chi][r.metodo]||0)+r.imp;
-    if(r.chi!==p.id){forOthers[r.chi].push(nomeDi(p.id)+' '+eur(r.imp));byOthers[p.id].push(nomeDi(r.chi)+' '+eur(r.imp)+' '+r.metodo.toLowerCase())}
   }));
+  // chi paga per qualcun altro (un solo importo per coppia, anche se diviso tra contanti e bonifico)
+  S.p.forEach(p=>{
+    const c=C[p.id],altro=c.righe.length&&c.righe[0].chi!==p.id;
+    if(!altro)return;
+    const chi=c.righe[0].chi,tot=r2(c.righe.reduce((a,r)=>a+r.imp,0));
+    forOthers[chi].push(nomeDi(p.id)+' '+eur(tot));
+    byOthers[p.id].push(nomeDi(chi)+' '+c.righe.map(r=>eur(r.imp)+' '+r.metodo.toLowerCase()).join(' + '));
+  });
   const cc=campo();
   $('#campo-note').textContent=cc.ingresso===null?'Indica l’ingresso del campo.':`Ingresso ${eur(cc.ingresso)} + tesseramento ${eur(LISTINO.tesseramento)}.`;
   $('#altro-box').classList.toggle('hidden',cc.ingresso!==null);
@@ -378,11 +456,32 @@ function update(){
     el.querySelectorAll('[data-act="sc"]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===p.sc)));
     LISTINO.calibri.forEach(k=>{const q=+p.extra[k.id]||0;el.querySelector(`[data-out="cal-${k.id}"]`).textContent=q?eur(costoCal(k,q)):''});
     el.querySelector('[data-out="extra"]').textContent=c.extra?'('+eur(c.extra)+')':'';
-    el.querySelectorAll('select[data-pf="chi"]').forEach(sel=>{
-      const r=p.pag[+sel.dataset.row];
-      if(document.activeElement!==sel){sel.innerHTML=opt('self','Lui/lei stesso',r.chi)+S.p.filter(x=>x.id!==p.id).map(x=>opt(x.id,nomeDi(x.id),r.chi)).join('')}
-    });
-    el.querySelector('[data-out="resto"]').textContent=p.pag.length>1?'resto '+eur(Math.max(0,c.resto)):eur(Math.max(0,c.resto));
+    // --- pagamento ---
+    const altri=S.p.filter(x=>x.id!==p.id), altro=p.chi!=='self';
+    const primo=p.nome.trim().split(/\s+/)[0];
+    const bSelf=el.querySelector('[data-act="chi"][data-v="self"]'),bAltro=el.querySelector('[data-act="chi"][data-v="other"]');
+    bSelf.textContent=primo?'Paga '+primo:'Paga lui/lei';
+    bSelf.setAttribute('aria-pressed',String(!altro));bAltro.setAttribute('aria-pressed',String(altro));
+    bAltro.disabled=!altri.length;
+    el.querySelector('[data-box="noother"]').classList.toggle('hidden',altri.length>0);
+    el.querySelector('[data-box="other"]').classList.toggle('hidden',!altro);
+    const selChi=el.querySelector('select[data-f="chi"]');
+    if(altro&&document.activeElement!==selChi)selChi.innerHTML=altri.map(x=>opt(x.id,nomeDi(x.id),p.chi)).join('');
+    el.querySelectorAll('[data-act="met"]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===p.metodo)));
+    const nulla=c.dovuto<=0;
+    el.querySelector('[data-box="nopay"]').classList.toggle('hidden',!nulla);
+    el.querySelector('[data-box="payform"]').classList.toggle('hidden',nulla);
+    el.querySelector('[data-box="mixed"]').classList.toggle('hidden',p.metodo!=='Misto');
+    el.querySelector('[data-out="bank"]').textContent=eur(c.bonifico);
+    el.querySelector('[data-out="dov2"]').textContent=eur(c.dovuto);
+    const quando=[];
+    if(c.contanti)quando.push('contanti '+eur(c.contanti));
+    if(c.bonifico)quando.push('bonifico '+eur(c.bonifico));
+    const chiPaga=altro?nomeDi(p.chi):(primo||'Il partecipante');
+    const altriPaga=forOthers[p.id];
+    el.querySelector('[data-out="recap"]').textContent=nulla?'':
+      `${chiPaga} paga ${quando.join(' + ')}.`+(altriPaga.length?` ${primo||'Questo partecipante'} paga anche per: ${altriPaga.join(', ')}.`:'');
+    el.querySelector('[data-out="recap"]').classList.toggle('hidden',nulla);
     // dettaglio
     const det=[];
     if(c.pkg||c.pk.id)det.push([c.pk.orario?`Lezione ${num(p.ore)}h × ${eur(num(p.tariffa))}`:(c.pk.id?'Pacchetto '+c.pk.nome:'Pacchetto'),c.pkg]);
@@ -397,16 +496,16 @@ function update(){
     el.querySelector('[data-out="det"]').innerHTML=h;
     el.querySelector('[data-out="prev"]').textContent=eur(c.listino);
     el.querySelector('[data-out="dov"]').textContent=eur(c.dovuto);
-    const tot=r2(c.righe.reduce((a,r)=>a+r.imp,0));
-    el.querySelector('[data-out="paid"]').textContent=eur(tot);
     // controlli
     if(!p.nome.trim())pe.push('Manca nome e cognome.');
     if(p.sc&&!p.motivo.trim())pe.push('Serve il motivo dello sconto.');
     if(p.sc==='eur'&&!num(p.scEur))pe.push('Indica l’importo dello sconto.');
     if(p.vou&&!p.vcod.trim())pe.push('Serve il codice del buono.');
     if(p.vou&&!num(p.vval))pe.push('Indica il valore del buono.');
-    if(c.resto<0)pe.push(`I pagamenti superano il dovuto di ${eur(-c.resto)}.`);
-    p.pag.slice(1).forEach((r,j)=>{if(!num(r.imp))pe.push(`Pagamento ${j+2}: indica l’importo.`)});
+    if(c.dovuto>0&&p.metodo==='Misto'){
+      if(!num(p.cash))pe.push('Indica quanti contanti paga (il resto va in bonifico).');
+      else if(num(p.cash)>c.dovuto)pe.push(`I contanti superano il dovuto di ${eur(num(p.cash)-c.dovuto)}.`);
+    }
     el.querySelector('[data-out="err"]').textContent=pe.join(' ');
     el.classList.toggle('err',pe.length>0);
     pe.forEach(x=>errs.push(n+': '+x));
@@ -455,13 +554,15 @@ function update(){
 function pOf(el){const c=el.closest('.p');return c&&S.p.find(x=>x.id===c.dataset.id)}
 function onEdit(t){
   if(t.id==='d-data')S.data=t.value;
-  else if(t.id==='d-istr')S.istr=t.value;
+  else if(t.id==='d-istr'){
+    if(t.value==='__new'){apriNuovoIstr();return}
+    S.istr=t.value;$('#istr-new').classList.add('hidden');renderIstr();
+  }
   else if(t.id==='d-ingresso')S.ingresso=t.value;
   else if(t.id==='d-campo')S.campo=t.value;
   else{
     const p=pOf(t);if(!p)return;
-    if(t.dataset.pf){p.pag[+t.dataset.row][t.dataset.pf]=t.value}
-    else if(t.dataset.f==='extra')p.extra[t.dataset.cal]=Math.max(0,parseInt(t.value)||0);
+    if(t.dataset.f==='extra')p.extra[t.dataset.cal]=Math.max(0,parseInt(t.value)||0);
     else if(t.dataset.f){p[t.dataset.f]=t.type==='checkbox'?t.checked:t.value}
     else return;
   }
@@ -476,18 +577,24 @@ document.addEventListener('click',ev=>{
     const k=b.dataset.cal;p.extra[k]=Math.max(0,(+p.extra[k]||0)+(a==='plus'?5:-5));
     b.parentNode.querySelector('input').value=p.extra[k]||'';update();
   }else if(a==='sc'){p.sc=b.dataset.v;update();if(p.sc){const m=b.closest('.p').querySelector(p.sc==='eur'?'[data-f="scEur"]':'[data-f="motivo"]');m&&m.focus()}}
-  else if(a==='addrow'){p.pag.push({chi:'self',metodo:'Bonifico',imp:''});rerender(p);
-    const ins=document.querySelectorAll(`.p[data-id="${p.id}"] [data-pf="chi"]`);ins[ins.length-1].focus()}
-  else if(a==='delrow'){p.pag.splice(+b.dataset.row,1);rerender(p)}
+  else if(a==='chi'){
+    if(b.dataset.v==='self')p.chi='self';
+    else{const altri=S.p.filter(x=>x.id!==p.id);if(!altri.length)return;if(p.chi==='self')p.chi=altri[0].id}
+    update();
+  }
+  else if(a==='met'){
+    p.metodo=b.dataset.v;update();
+    if(p.metodo==='Misto'){const i=b.closest('.p').querySelector('[data-f="cash"]');i&&i.focus()}
+  }
   else if(a==='del'){S.p=S.p.length===1?[nuovo()]:S.p.filter(x=>x.id!==p.id);render()}
 });
-function rerender(p){
-  const el=document.querySelector(`.p[data-id="${p.id}"]`);
-  const open=[...el.querySelectorAll('details')].map(d=>d.open);
-  const t=document.createElement('div');t.innerHTML=card(p,S.p.indexOf(p));
-  const nu=t.firstElementChild;[...nu.querySelectorAll('details')].forEach((d,i)=>d.open=open[i]);
-  el.replaceWith(nu);update();
-}
+$('#istr-add').onclick=aggiungiIstr;
+$('#istr-cancel').onclick=chiudiNuovoIstr;
+$('#istr-nome').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();aggiungiIstr()}else if(ev.key==='Escape')chiudiNuovoIstr()});
+$('#istr-del').onclick=()=>{
+  if(!confirm(`Togliere ${S.istr} dall’elenco degli istruttori di questo dispositivo?`))return;
+  ISTR_EXTRA=ISTR_EXTRA.filter(n=>n!==S.istr);saveIstr();S.istr='';renderIstr();update();
+};
 $('#add').onclick=()=>{
   const n=nuovo();const last=S.p[S.p.length-1];if(last)n.pac=last.pac;
   S.p.push(n);render();
@@ -515,7 +622,7 @@ $('#listino').innerHTML='<table>'+
   LISTINO.campi.filter(c=>c.ingresso!==null).map(c=>`<tr><td>Ingresso ${c.nome}</td><td>${eur(c.ingresso)}</td></tr>`).join('')+
   `<tr><td>Sconti</td><td>${LISTINO.scontiPercentuali.join('%, ')}% o importo fisso, con motivo</td></tr></table>`;
 
-load();render();
+loadIstr();load();render();
 </script>
 </body>
 </html>

@@ -19,6 +19,21 @@ Pagina web per gli istruttori di Tactical Defence Academy: calcola gli importi d
 
 Nel listino si usano il punto per i decimali (`0.5`) e la virgola per separare le voci: non cancellarle.
 
+## Istruttori
+
+L’istruttore si sceglie da un elenco a tendina, ordinato in automatico. Per aggiungerne uno **per tutti** scrivi il nome in `listino.js`, nella lista `istruttori`.
+
+Dall’app si può anche scegliere “＋ Aggiungi un nuovo istruttore…”: il nome resta solo su quel dispositivo (e si può togliere dall’elenco con “Rimuovi questo istruttore”).
+
+## Pagamenti
+
+Per ogni partecipante, la sezione Pagamento è in due passaggi:
+
+1. **Chi paga?** Il partecipante stesso oppure un altro partecipante della giornata (per esempio un genitore che paga per un figlio).
+2. **Come paga?** Contanti, Bonifico oppure Contanti + bonifico. In quest’ultimo caso si indicano i contanti e il resto va in automatico a bonifico.
+
+Il pulsante in basso e il riepilogo mostrano i contanti da consegnare e i bonifici incassati.
+
 ## Dati
 
 La pagina non invia dati a nessun server. La giornata in corso resta salvata solo nel browser del dispositivo finché non si preme “Nuova giornata”.

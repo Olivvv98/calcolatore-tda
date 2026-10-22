@@ -32,5 +32,16 @@ const LISTINO = {
   ],
   scontiPercentuali: [5,10,15],
   metodi: ['Contanti','Bonifico'],
-  istruttori: ['Alessandro Cossu','Mauro Mostallino']
+  // Elenco a tendina dell'istruttore (ordinato in automatico). Per aggiungerne uno per tutti, scrivilo qui.
+  // Dall'app si può anche aggiungere un istruttore nuovo, ma resta solo su quel dispositivo.
+  istruttori: [
+    'Alessandro Cossu',
+    'Alessandro De Filippi',
+    'Teofilo Loi',
+    'Stefano Mirabella',
+    'Mauro Mostallino',
+    'Simone Pellitteri',
+    'Nicola Molino',
+    'Antonio Olivieri'
+  ]
 };
