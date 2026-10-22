@@ -306,6 +306,9 @@ function sigla(p,c){
   if(c.ing&&c.tes)parts.push('IA');else if(c.ing)parts.push('I');else if(c.tes)parts.push('T');
   return parts.join(' + ')||'—';
 }
+/* codice buono: 6 cifre esadecimali con uno spazio dopo le prime 3 (es. ABC 123) */
+const COD_BUONO=/^[0-9A-F]{3} [0-9A-F]{3}$/;
+function fmtCodice(v){const h=String(v).toUpperCase().replace(/[^0-9A-F]/g,'').slice(0,6);return h.length>3?h.slice(0,3)+' '+h.slice(3):h}
 function nomeDi(id){const p=S.p.find(x=>x.id===id);return p?(p.nome.trim()||'Partecipante '+(S.p.indexOf(p)+1)):'?'}
 
 /* ===== RENDER ===== */
@@ -376,10 +379,11 @@ function card(p,i){
     <label class="check"><input type="checkbox" data-f="vou" ${p.vou?'checked':''}> Usa un buono regalo</label>
     <div class="${p.vou?'':'hidden'}" data-box="vou">
       <div class="row">
-        <div><label>Codice buono</label><input data-f="vcod" value="${esc(p.vcod)}" autocomplete="off"></div>
+        <div><label>Codice buono</label><input data-f="vcod" value="${esc(p.vcod)}" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="7"></div>
         <div><label>Valore (€)</label><input type="number" min="0" step="1" inputmode="decimal" data-f="vval" value="${esc(p.vval)}"></div>
       </div>
       <label>Emesso da</label><select data-f="vente">${opt('TDA','TDA',p.vente)}${opt('IDA','IDA',p.vente)}</select>
+      <p class="note">Seleziona se è un buono International Defence Academy (IDA) o Tactical Defence Academy (TDA): si vede dal logo sul buono.</p>
     </div>
 
     <p class="sublabel">Pagamento</p>
@@ -501,6 +505,7 @@ function update(){
     if(p.sc&&!p.motivo.trim())pe.push('Serve il motivo dello sconto.');
     if(p.sc==='eur'&&!num(p.scEur))pe.push('Indica l’importo dello sconto.');
     if(p.vou&&!p.vcod.trim())pe.push('Serve il codice del buono.');
+    else if(p.vou&&!COD_BUONO.test(p.vcod))pe.push('Il codice del buono deve avere 6 cifre esadecimali (0-9, A-F) con uno spazio dopo le prime 3, per esempio ABC 123.');
     if(p.vou&&!num(p.vval))pe.push('Indica il valore del buono.');
     if(c.dovuto>0&&p.metodo==='Misto'){
       if(!num(p.cash))pe.push('Indica quanti contanti paga (il resto va in bonifico).');
@@ -562,7 +567,8 @@ function onEdit(t){
   else if(t.id==='d-campo')S.campo=t.value;
   else{
     const p=pOf(t);if(!p)return;
-    if(t.dataset.f==='extra')p.extra[t.dataset.cal]=Math.max(0,parseInt(t.value)||0);
+    if(t.dataset.f==='vcod'){const f=fmtCodice(t.value);if(t.value!==f)t.value=f;p.vcod=f}
+    else if(t.dataset.f==='extra')p.extra[t.dataset.cal]=Math.max(0,parseInt(t.value)||0);
     else if(t.dataset.f){p[t.dataset.f]=t.type==='checkbox'?t.checked:t.value}
     else return;
   }
